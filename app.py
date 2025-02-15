@@ -4,19 +4,72 @@ import os
 import cv2
 import numpy as np
 from werkzeug.utils import secure_filename
+from datetime import datetime
 
 app = Flask(__name__)
 
 # Konfigurasi folder upload
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = "dataset"
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Path database wajah
-DB_PATH = "dataset/isal"  # Sesuaikan dengan lokasi dataset wajah
+# DB_PATH = "dataset/isal"  # Sesuaikan dengan lokasi dataset wajah
+DB_PATH = "dataset"  # Sesuaikan dengan lokasi dataset wajah
 
+def save_face_image(image_path, name):
+    # Baca gambar menggunakan OpenCV
+    img = cv2.imread(image_path)
+
+    # Mendeteksi wajah di gambar
+    # result = DeepFace.detectFace(img, detector_backend='opencv')
+    
+    # Jika wajah ditemukan, simpan wajah tersebut
+    if img is not None:
+        # Nama file berdasarkan timestamp dan nama pengguna
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        face_filename = f"{name}_{timestamp}.jpg"
+        face_path = os.path.join(DB_PATH, face_filename)
+
+        # Simpan gambar wajah ke folder dataset
+        cv2.imwrite(face_path, img)
+        return face_path
+    return None
+
+@app.route("/register", methods=["POST"])
+def register():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+
+    # Ambil nama pengguna dari parameter form
+    name = request.form.get("name")
+    if not name:
+        return jsonify({"error": "Name not provided"}), 400
+
+    # Simpan file sementara
+    filename = secure_filename(file.filename)
+    file_path = os.path.join("dataset", filename)
+    file.save(file_path)
+
+    # Simpan wajah yang terdeteksi ke dataset
+    try:
+        face_path = save_face_image(file_path, name)
+        if face_path:
+            return jsonify({"status": "success", "message": f"Face registered as {name}", "face_path": face_path}), 200
+        else:
+            return jsonify({"status": "failed", "message": "No face detected in the image"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # Hapus file sementara setelah diproses
+        os.remove(file_path)
+        
 @app.route("/recognize", methods=["POST"])
 def recognize():
     if "file" not in request.files:
