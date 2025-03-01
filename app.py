@@ -52,9 +52,16 @@ def register():
     if not name:
         return jsonify({"error": "Name not provided"}), 400
 
+    # Tentukan path folder untuk nama pengguna
+    user_folder = os.path.join(DB_PATH, name)
+
+    # Jika folder untuk nama pengguna belum ada, buat folder baru
+    if not os.path.exists(user_folder):
+        os.makedirs(user_folder)
+
     # Simpan file sementara
     filename = secure_filename(file.filename)
-    file_path = os.path.join("dataset", filename)
+    file_path = os.path.join(user_folder, filename)
     file.save(file_path)
 
     # Simpan wajah yang terdeteksi ke dataset
@@ -101,4 +108,4 @@ def recognize():
         os.remove(file_path)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='192.168.1.10', port=5000,debug=True)
