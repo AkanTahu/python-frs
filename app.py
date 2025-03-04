@@ -61,51 +61,79 @@ def register():
 
     # Simpan file sementara
     filename = secure_filename(file.filename)
-    file_path = os.path.join(user_folder, filename)
-    file.save(file_path)
+    temp_file_path = os.path.join("dataset", filename)  # Tempat sementara untuk menyimpan file
+    file.save(temp_file_path)
 
-    # Simpan wajah yang terdeteksi ke dataset
+    # Simpan wajah yang terdeteksi ke folder yang sesuai
     try:
-        face_path = save_face_image(file_path, name)
+        # Baca gambar yang disimpan sementara
+        face_path = save_face_image(temp_file_path, name)
+        
         if face_path:
-            return jsonify({"status": "success", "message": f"Face registered as {name}", "face_path": face_path}), 200
+            # Pindahkan file yang sudah diproses ke folder yang sesuai berdasarkan nama pengguna
+            final_face_path = os.path.join(user_folder, os.path.basename(face_path))
+            os.rename(face_path, final_face_path)  # Memindahkan file ke folder yang sesuai
+
+            return jsonify({"status": "success", "message": f"Face registered as {name}", "face_path": final_face_path}), 200
         else:
             return jsonify({"status": "failed", "message": "No face detected in the image"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         # Hapus file sementara setelah diproses
-        os.remove(file_path)
+        os.remove(temp_file_path)
+
         
 @app.route("/recognize", methods=["POST"])
 def recognize():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"}), 400
+    print("Received request for recognition")
+    if "file" not in request.files or "username" not in request.form:
+        return jsonify({"error": "File and username are required"}), 400
 
     file = request.files["file"]
+    username = request.form["username"]
+
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # Simpan file sementara
+    # Define user-specific dataset path
+    user_dataset_path = os.path.join(DB_PATH, username)
+
+    # Check if the user's dataset exists
+    if not os.path.exists(user_dataset_path):
+        return jsonify({"status": "3"}), 404
+
+    # Save the uploaded file temporarily
     filename = secure_filename(file.filename)
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(file_path)
-
+    
     try:
-        # Jalankan Face Recognition menggunakan DeepFace
-        result = DeepFace.find(img_path=file_path, db_path=DB_PATH, model_name="Facenet", enforce_detection=False)
+        # Ambil semua gambar di dataset pengguna (misalnya 3 gambar pertama)
+        dataset_images = [os.path.join(user_dataset_path, img) for img in os.listdir(user_dataset_path)[:3]]  # Mengambil 3 gambar pertama
+        print(f"Dataset images: {dataset_images}")
 
-        if result and not result[0].empty:
-            identity = result[0]["identity"][0]  # Ambil wajah terdekat
-            person_name = os.path.basename(identity).split(".")[0]  # Ambil nama dari filename
-            return jsonify({"status": "success", "recognized_as": person_name}), 200
-        else:
-            return jsonify({"status": "failed", "message": "Face not recognized"}), 200
+        # Loop untuk memeriksa gambar input dengan setiap gambar di dataset
+        for dataset_image in dataset_images:
+            print(f"Comparing with: {dataset_image}")
+            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet")
+            print(f"Result: {result}")  # Cek hasil dari verify()
+
+            if result["verified"]:  # Jika ada gambar yang cocok
+                print("Wajah terdeteksi")
+                return jsonify({"status": "1"}), 200  # Wajah terdeteksi, kembalikan dengan dictionary
+
+        # Jika tidak ada gambar yang cocok
+        return jsonify({"status": "0"}), 404  # Wajah tidak dikenali
+
     except Exception as e:
+        print(f"Error during face verification: {str(e)}")  # Print error detail
         return jsonify({"error": str(e)}), 500
     finally:
-        # Hapus file setelah diproses untuk menghemat storage
-        os.remove(file_path)
+        # Remove the temporary uploaded file to save space
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 if __name__ == "__main__":
-    app.run(host='192.168.1.10', port=5000,debug=True)
+    # app.run(host='192.168.72.7', port=5000,debug=True)
+    app.run(host='192.168.1.8', port=5000,debug=True)
