@@ -1,0 +1,6 @@
+Flask
+DeepFace
+numpy
+requests
+gunicorn
+Werkzeug
