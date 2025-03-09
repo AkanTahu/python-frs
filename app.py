@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from deepface import DeepFace
 import os
 import cv2
+import requests
 import numpy as np
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -12,11 +13,14 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "dataset"
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+    
+RESULT_FOLDER = os.path.join(os.getcwd(), "result")
+if not os.path.exists(RESULT_FOLDER):
+    os.makedirs(RESULT_FOLDER)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Path database wajah
-# DB_PATH = "dataset/isal"  # Sesuaikan dengan lokasi dataset wajah
+LARAVEL_API_URL = "http://192.168.1.8:8000/scan-faces"
 DB_PATH = "dataset"  # Sesuaikan dengan lokasi dataset wajah
 
 def save_face_image(image_path, name):
@@ -47,32 +51,25 @@ def register():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # Ambil nama pengguna dari parameter form
     name = request.form.get("name")
     if not name:
         return jsonify({"error": "Name not provided"}), 400
 
-    # Tentukan path folder untuk nama pengguna
     user_folder = os.path.join(DB_PATH, name)
 
-    # Jika folder untuk nama pengguna belum ada, buat folder baru
     if not os.path.exists(user_folder):
         os.makedirs(user_folder)
 
-    # Simpan file sementara
     filename = secure_filename(file.filename)
-    temp_file_path = os.path.join("dataset", filename)  # Tempat sementara untuk menyimpan file
+    temp_file_path = os.path.join("dataset", filename)
     file.save(temp_file_path)
 
-    # Simpan wajah yang terdeteksi ke folder yang sesuai
     try:
-        # Baca gambar yang disimpan sementara
         face_path = save_face_image(temp_file_path, name)
         
         if face_path:
-            # Pindahkan file yang sudah diproses ke folder yang sesuai berdasarkan nama pengguna
             final_face_path = os.path.join(user_folder, os.path.basename(face_path))
-            os.rename(face_path, final_face_path)  # Memindahkan file ke folder yang sesuai
+            os.rename(face_path, final_face_path)
 
             return jsonify({"status": "success", "message": f"Face registered as {name}", "face_path": final_face_path}), 200
         else:
@@ -80,7 +77,6 @@ def register():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        # Hapus file sementara setelah diproses
         os.remove(temp_file_path)
 
         
@@ -92,47 +88,74 @@ def recognize():
 
     file = request.files["file"]
     username = request.form["username"]
+    user_id  = request.form["id"]
+    
+    print(f"Received file: {file}, username: {username}, user_id: {user_id}")
 
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    # Define user-specific dataset path
     user_dataset_path = os.path.join(DB_PATH, username)
 
-    # Check if the user's dataset exists
     if not os.path.exists(user_dataset_path):
         return jsonify({"status": "3"}), 404
 
-    # Save the uploaded file temporarily
     filename = secure_filename(file.filename)
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(file_path)
     
     try:
-        # Ambil semua gambar di dataset pengguna (misalnya 3 gambar pertama)
-        dataset_images = [os.path.join(user_dataset_path, img) for img in os.listdir(user_dataset_path)[:3]]  # Mengambil 3 gambar pertama
+        dataset_images = [os.path.join(user_dataset_path, img) for img in os.listdir(user_dataset_path)[:3]]
         print(f"Dataset images: {dataset_images}")
 
-        # Loop untuk memeriksa gambar input dengan setiap gambar di dataset
         for dataset_image in dataset_images:
             print(f"Comparing with: {dataset_image}")
             result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet")
-            print(f"Result: {result}")  # Cek hasil dari verify()
+            print(f"Result: {result}")
 
-            if result["verified"]:  # Jika ada gambar yang cocok
-                print("Wajah terdeteksi")
-                return jsonify({"status": "1"}), 200  # Wajah terdeteksi, kembalikan dengan dictionary
+            if result["verified"]: 
+                result_image_path = os.path.join(RESULT_FOLDER, f"{username}_{filename}")
+                cv2.imwrite(result_image_path, cv2.imread(file_path))
+                
+                status = "SUKSES"
+                send_data_to_laravel(user_id, result_image_path, status)
+                
+                return jsonify({"status": "1"}), 200 
 
-        # Jika tidak ada gambar yang cocok
-        return jsonify({"status": "0"}), 404  # Wajah tidak dikenali
+        status = "GAGAL"
+        send_data_to_laravel(user_id, result_image_path, status)
+        return jsonify({"status": "0"}), 404 
 
     except Exception as e:
-        print(f"Error during face verification: {str(e)}")  # Print error detail
+        print(f"Error during face verification: {str(e)}") 
         return jsonify({"error": str(e)}), 500
     finally:
-        # Remove the temporary uploaded file to save space
         if os.path.exists(file_path):
             os.remove(file_path)
+            
+def send_data_to_laravel(user_id, result_image_path, status):
+    """Fungsi untuk mengirim data ke Laravel"""
+    data = {
+        "user_id": user_id,
+        "image_path": result_image_path if result_image_path else None,
+        "status": status
+    }
+    
+    headers = {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+    }
+
+    try:
+        # Mengirim request POST ke Laravel API
+        response = requests.post(LARAVEL_API_URL, data=data, headers=headers)
+        print(f"Response from Laravel: {response.text}")
+        if response.status_code == 201 :
+            print("Data berhasil dikirim ke Laravel")
+        else:
+            print(f"Failed to send data to Laravel. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        print(f"Error while sending data to Laravel: {str(e)}")
 
 if __name__ == "__main__":
     # app.run(host='192.168.72.7', port=5000,debug=True)
