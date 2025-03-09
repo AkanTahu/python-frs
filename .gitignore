@@ -16,6 +16,8 @@ lib64/
 parts/
 sdist/
 var/
+Mekanik/
+Mr/
 wheels/
 *.egg-info/
 .installed.cfg
@@ -32,7 +34,6 @@ ENV/
 *.swo
 
 # Project specific
-dataset/
 *.jpg
 *.jpeg
 *.png
