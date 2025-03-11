@@ -14,13 +14,13 @@ UPLOAD_FOLDER = "dataset"
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
     
-RESULT_FOLDER = os.path.join(os.getcwd(), "result")
+RESULT_FOLDER = "../rekachain-web/storage/app/public/result_scan_faces"
 if not os.path.exists(RESULT_FOLDER):
     os.makedirs(RESULT_FOLDER)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-LARAVEL_API_URL = "http://192.168.1.8:8000/scan-faces"
+LARAVEL_API_URL = "http://192.168.76.118:8000/scan-faces"
 DB_PATH = "dataset"  # Sesuaikan dengan lokasi dataset wajah
 
 def save_face_image(image_path, name):
@@ -159,4 +159,5 @@ def send_data_to_laravel(user_id, result_image_path, status):
 
 if __name__ == "__main__":
     # app.run(host='192.168.72.7', port=5000,debug=True)
-    app.run(host='192.168.1.8', port=5000,debug=True)
+    # app.run(host='192.168.1.8', port=5000,debug=True)
+    app.run(host='192.168.76.118', port=5000,debug=True)

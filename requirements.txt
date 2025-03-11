@@ -1,6 +1,8 @@
 Flask
-DeepFace
+tensorflow
+tf-keras
 numpy
 requests
 gunicorn
 Werkzeug
+DeepFace

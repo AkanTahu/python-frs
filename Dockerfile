@@ -3,6 +3,8 @@ LABEL org.opencontainers.image.source https://github.com/serengil/deepface
 
 WORKDIR /app
 
+COPY . /app
+
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsm6 \
@@ -27,5 +29,7 @@ RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted
 # RUN pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org -e .
 
 ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "./app.py"]
 
 EXPOSE 5000
