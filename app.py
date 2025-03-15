@@ -9,19 +9,23 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Konfigurasi folder upload
-UPLOAD_FOLDER = "dataset"
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+
+# Configure folders with absolute paths
+UPLOAD_FOLDER = os.path.join("./rekachain-web/storage/app/public/dataset_faces")
+# if not os.path.exists(UPLOAD_FOLDER):
+#     os.makedirs(UPLOAD_FOLDER)
     
-RESULT_FOLDER = "../rekachain-web/storage/app/public/result_scan_faces"
-if not os.path.exists(RESULT_FOLDER):
-    os.makedirs(RESULT_FOLDER)
+RESULT_FOLDER = os.path.join("./rekachain-web/storage/app/public/result_scan_faces")
+# if not os.path.exists(RESULT_FOLDER):
+#     os.makedirs(RESULT_FOLDER)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+DB_PATH = UPLOAD_FOLDER  # Now using the same absolute path as UPLOAD_FOLDER
 
-LARAVEL_API_URL = "http://192.168.76.118:8000/scan-faces"
-DB_PATH = "dataset"  # Sesuaikan dengan lokasi dataset wajah
+
+# LARAVEL_API_URL = "http://192.168.76.118:8000/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.11:8000/scan-faces"
+DB_PATH = "./rekachain-web/storage/app/public/dataset_faces"  # Sesuaikan dengan lokasi dataset wajah
 
 def save_face_image(image_path, name):
     # Baca gambar menggunakan OpenCV
@@ -61,7 +65,7 @@ def register():
         os.makedirs(user_folder)
 
     filename = secure_filename(file.filename)
-    temp_file_path = os.path.join("dataset", filename)
+    temp_file_path = os.path.join("./rekachain-web/storage/app/public/dataset_faces", filename)
     file.save(temp_file_path)
 
     try:
@@ -89,6 +93,8 @@ def recognize():
     file = request.files["file"]
     username = request.form["username"]
     user_id  = request.form["id"]
+    panel  = request.form["panel"]
+    kpm  = request.form["kpm"]
     
     print(f"Received file: {file}, username: {username}, user_id: {user_id}")
 
@@ -114,11 +120,12 @@ def recognize():
             print(f"Result: {result}")
 
             if result["verified"]: 
-                result_image_path = os.path.join(RESULT_FOLDER, f"{username}_{filename}")
+                result_filename = f"{username}_{filename}"
+                result_image_path = os.path.join(RESULT_FOLDER, result_filename)
                 cv2.imwrite(result_image_path, cv2.imread(file_path))
                 
                 status = "SUKSES"
-                send_data_to_laravel(user_id, result_image_path, status)
+                send_data_to_laravel(user_id, result_filename, status, panel, kpm)
                 
                 return jsonify({"status": "1"}), 200 
 
@@ -133,12 +140,14 @@ def recognize():
         if os.path.exists(file_path):
             os.remove(file_path)
             
-def send_data_to_laravel(user_id, result_image_path, status):
+def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
     """Fungsi untuk mengirim data ke Laravel"""
     data = {
         "user_id": user_id,
         "image_path": result_image_path if result_image_path else None,
-        "status": status
+        "status": status,
+        "panel": panel,
+        "kpm": kpm
     }
     
     headers = {
@@ -159,5 +168,4 @@ def send_data_to_laravel(user_id, result_image_path, status):
 
 if __name__ == "__main__":
     # app.run(host='192.168.72.7', port=5000,debug=True)
-    # app.run(host='192.168.1.8', port=5000,debug=True)
-    app.run(host='192.168.76.118', port=5000,debug=True)
+    app.run(host='192.168.1.11', port=5000,debug=True)
