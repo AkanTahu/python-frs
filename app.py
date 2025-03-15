@@ -10,38 +10,30 @@ from datetime import datetime
 app = Flask(__name__)
 
 
-# Configure folders with absolute paths
-UPLOAD_FOLDER = os.path.join("./rekachain-web/storage/app/public/dataset_faces")
-# if not os.path.exists(UPLOAD_FOLDER):
-#     os.makedirs(UPLOAD_FOLDER)
-    
-RESULT_FOLDER = os.path.join("./rekachain-web/storage/app/public/result_scan_faces")
-# if not os.path.exists(RESULT_FOLDER):
-#     os.makedirs(RESULT_FOLDER)
+# Konfigurasi folder dataset wajah dan hasil scan di Laravel
+BASE_LARAVEL_STORAGE = os.path.abspath("../rekachain-web/storage/app/public")
+DB_PATH = os.path.join(BASE_LARAVEL_STORAGE, "dataset_faces")
+RESULT_FOLDER = os.path.join(BASE_LARAVEL_STORAGE, "result_scan_faces")
 
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-DB_PATH = UPLOAD_FOLDER  # Now using the same absolute path as UPLOAD_FOLDER
+# Pastikan folder dataset_faces dan result_scan_faces ada
+os.makedirs(DB_PATH, exist_ok=True)
+os.makedirs(RESULT_FOLDER, exist_ok=True)
 
-
-# LARAVEL_API_URL = "http://192.168.76.118:8000/scan-faces"
+app.config["UPLOAD_FOLDER"] = DB_PATH
 LARAVEL_API_URL = "http://192.168.1.11:8000/scan-faces"
-DB_PATH = "./rekachain-web/storage/app/public/dataset_faces"  # Sesuaikan dengan lokasi dataset wajah
 
 def save_face_image(image_path, name):
     # Baca gambar menggunakan OpenCV
     img = cv2.imread(image_path)
 
-    # Mendeteksi wajah di gambar
-    # result = DeepFace.detectFace(img, detector_backend='opencv')
-    
-    # Jika wajah ditemukan, simpan wajah tersebut
     if img is not None:
-        # Nama file berdasarkan timestamp dan nama pengguna
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         face_filename = f"{name}_{timestamp}.jpg"
-        face_path = os.path.join(DB_PATH, face_filename)
+        face_path = os.path.join(DB_PATH, name, face_filename)
 
-        # Simpan gambar wajah ke folder dataset
+        # Pastikan folder user ada
+        os.makedirs(os.path.dirname(face_path), exist_ok=True)
+
         cv2.imwrite(face_path, img)
         return face_path
     return None
@@ -61,11 +53,11 @@ def register():
 
     user_folder = os.path.join(DB_PATH, name)
 
-    if not os.path.exists(user_folder):
-        os.makedirs(user_folder)
+    user_folder = os.path.join(DB_PATH, name)
+    os.makedirs(user_folder, exist_ok=True)  # Pastikan folder user ada
 
     filename = secure_filename(file.filename)
-    temp_file_path = os.path.join("./rekachain-web/storage/app/public/dataset_faces", filename)
+    temp_file_path = os.path.join(DB_PATH, filename)
     file.save(temp_file_path)
 
     try:
@@ -75,13 +67,19 @@ def register():
             final_face_path = os.path.join(user_folder, os.path.basename(face_path))
             os.rename(face_path, final_face_path)
 
-            return jsonify({"status": "success", "message": f"Face registered as {name}", "face_path": final_face_path}), 200
+            return jsonify({
+                "status": "success",
+                "message": f"Face registered as {name}",
+                "face_path": final_face_path
+            }), 200
         else:
-            return jsonify({"status": "failed", "message": "No face detected in the image"}), 200
+            return jsonify({"status": "failed", 
+                            "message": "No face detected in the image"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        os.remove(temp_file_path)
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
         
 @app.route("/recognize", methods=["POST"])
@@ -96,7 +94,7 @@ def recognize():
     panel  = request.form["panel"]
     kpm  = request.form["kpm"]
     
-    print(f"Received file: {file}, username: {username}, user_id: {user_id}")
+    print(f"Received file: {file}, username: {username}, user_id: {user_id}, panel: {panel}, kpm: {kpm}")
 
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
@@ -104,7 +102,7 @@ def recognize():
     user_dataset_path = os.path.join(DB_PATH, username)
 
     if not os.path.exists(user_dataset_path):
-        return jsonify({"status": "3"}), 404
+        return jsonify({"status": "2"}), 200
 
     filename = secure_filename(file.filename)
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
@@ -128,10 +126,14 @@ def recognize():
                 send_data_to_laravel(user_id, result_filename, status, panel, kpm)
                 
                 return jsonify({"status": "1"}), 200 
-
-        status = "GAGAL"
-        send_data_to_laravel(user_id, result_image_path, status)
-        return jsonify({"status": "0"}), 404 
+            else:
+                result_filename = f"{username}_{filename}"
+                result_image_path = os.path.join(RESULT_FOLDER, result_filename)
+                cv2.imwrite(result_image_path, cv2.imread(file_path))
+                        
+                status = "GAGAL"
+                send_data_to_laravel(user_id, result_filename, status, panel, kpm)
+                return jsonify({"status": "0"}), 200 
 
     except Exception as e:
         print(f"Error during face verification: {str(e)}") 
