@@ -20,16 +20,16 @@ os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
-LARAVEL_API_URL = "http://192.168.1.11:8000/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.13:8000/scan-faces"
 
-def save_face_image(image_path, name):
+def save_face_image(image_path, nip):
     # Baca gambar menggunakan OpenCV
     img = cv2.imread(image_path)
 
     if img is not None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        face_filename = f"{name}_{timestamp}.jpg"
-        face_path = os.path.join(DB_PATH, name, face_filename)
+        face_filename = f"{nip}_{timestamp}.jpg"
+        face_path = os.path.join(DB_PATH, nip, face_filename)
 
         # Pastikan folder user ada
         os.makedirs(os.path.dirname(face_path), exist_ok=True)
@@ -45,15 +45,15 @@ def register():
 
     file = request.files["file"]
     if file.filename == "":
-        return jsonify({"error": "No selected file"}), 400
+        return jsonify({"error": "No selected file"}), 401
 
-    name = request.form.get("name")
-    if not name:
-        return jsonify({"error": "Name not provided"}), 400
+    nip = request.form.get("nip")
+    if not nip:
+        return jsonify({"error": "Name not provided"}), 402
 
-    user_folder = os.path.join(DB_PATH, name)
+    user_folder = os.path.join(DB_PATH, nip)
 
-    user_folder = os.path.join(DB_PATH, name)
+    user_folder = os.path.join(DB_PATH, nip)
     os.makedirs(user_folder, exist_ok=True)  # Pastikan folder user ada
 
     filename = secure_filename(file.filename)
@@ -61,7 +61,7 @@ def register():
     file.save(temp_file_path)
 
     try:
-        face_path = save_face_image(temp_file_path, name)
+        face_path = save_face_image(temp_file_path, nip)
         
         if face_path:
             final_face_path = os.path.join(user_folder, os.path.basename(face_path))
@@ -69,7 +69,7 @@ def register():
 
             return jsonify({
                 "status": "success",
-                "message": f"Face registered as {name}",
+                "message": f"Face registered as {nip}",
                 "face_path": final_face_path
             }), 200
         else:
@@ -85,21 +85,21 @@ def register():
 @app.route("/recognize", methods=["POST"])
 def recognize():
     print("Received request for recognition")
-    if "file" not in request.files or "username" not in request.form:
-        return jsonify({"error": "File and username are required"}), 400
+    if "file" not in request.files or "nip" not in request.form:
+        return jsonify({"error": "File and nip are required"}), 400
 
     file = request.files["file"]
-    username = request.form["username"]
+    nip = request.form["nip"]
     user_id  = request.form["id"]
     panel  = request.form["panel"]
     kpm  = request.form["kpm"]
     
-    print(f"Received file: {file}, username: {username}, user_id: {user_id}, panel: {panel}, kpm: {kpm}")
+    print(f"Received file: {file}, nip: {nip}, user_id: {user_id}, panel: {panel}, kpm: {kpm}")
 
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    user_dataset_path = os.path.join(DB_PATH, username)
+    user_dataset_path = os.path.join(DB_PATH, nip)
 
     if not os.path.exists(user_dataset_path):
         return jsonify({"status": "2"}), 200
@@ -118,7 +118,7 @@ def recognize():
             print(f"Result: {result}")
 
             if result["verified"]: 
-                result_filename = f"{username}_{filename}"
+                result_filename = f"{nip}_{filename}"
                 result_image_path = os.path.join(RESULT_FOLDER, result_filename)
                 cv2.imwrite(result_image_path, cv2.imread(file_path))
                 
@@ -127,7 +127,7 @@ def recognize():
                 
                 return jsonify({"status": "1"}), 200 
             else:
-                result_filename = f"{username}_{filename}"
+                result_filename = f"{nip}_{filename}"
                 result_image_path = os.path.join(RESULT_FOLDER, result_filename)
                 cv2.imwrite(result_image_path, cv2.imread(file_path))
                         
@@ -170,4 +170,4 @@ def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
 
 if __name__ == "__main__":
     # app.run(host='192.168.72.7', port=5000,debug=True)
-    app.run(host='192.168.1.11', port=5000,debug=True)
+    app.run(host='192.168.1.13', port=5000,debug=True)
