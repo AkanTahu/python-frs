@@ -4,6 +4,9 @@ import os
 import cv2
 import requests
 import numpy as np
+import time
+import openpyxl
+import pandas as pd
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -11,6 +14,7 @@ app = Flask(__name__)
 
 
 # Konfigurasi folder dataset wajah dan hasil scan di Laravel
+BASE_PYTHON_STORAGE = os.path.abspath("./testing")
 BASE_LARAVEL_STORAGE = os.path.abspath("../rekachain-web/storage/app/public")
 DB_PATH = os.path.join(BASE_LARAVEL_STORAGE, "dataset_faces")
 RESULT_FOLDER = os.path.join(BASE_LARAVEL_STORAGE, "result_scan_faces")
@@ -20,7 +24,7 @@ os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
-LARAVEL_API_URL = "http://192.168.1.13:8000/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
 
 def save_face_image(image_path, nip):
     # Baca gambar menggunakan OpenCV
@@ -40,6 +44,7 @@ def save_face_image(image_path, nip):
 
 @app.route("/register", methods=["POST"])
 def register():
+    start_time_reg = time.time()
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
@@ -66,7 +71,7 @@ def register():
         if face_path:
             final_face_path = os.path.join(user_folder, os.path.basename(face_path))
             os.rename(face_path, final_face_path)
-
+            
             return jsonify({
                 "status": "success",
                 "message": f"Face registered as {nip}",
@@ -80,10 +85,15 @@ def register():
     finally:
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+            
+        end_time_reg = time.time()
+        detection_time_reg = end_time_reg - start_time_reg
+        log_to_excel_generate(nip, detection_time_reg)    
 
         
 @app.route("/recognize", methods=["POST"])
 def recognize():
+    start_time_recog = time.time()
     print("Received request for recognition")
     if "file" not in request.files or "nip" not in request.form:
         return jsonify({"error": "File and nip are required"}), 400
@@ -125,6 +135,9 @@ def recognize():
                 status = "SUKSES"
                 send_data_to_laravel(user_id, result_filename, status, panel, kpm)
                 
+                end_time_recog = time.time()
+                detection_time_recog = end_time_recog - start_time_recog
+                
                 return jsonify({"status": "1"}), 200 
             else:
                 result_filename = f"{nip}_{filename}"
@@ -133,6 +146,7 @@ def recognize():
                         
                 status = "GAGAL"
                 send_data_to_laravel(user_id, result_filename, status, panel, kpm)
+                
                 return jsonify({"status": "0"}), 200 
 
     except Exception as e:
@@ -141,6 +155,10 @@ def recognize():
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
+        
+        end_time_recog = time.time()
+        detection_time_recog = end_time_recog - start_time_recog
+        log_to_excel_recognition(nip, detection_time_recog, status)
             
 def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
     """Fungsi untuk mengirim data ke Laravel"""
@@ -168,6 +186,36 @@ def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
     except requests.exceptions.RequestException as e:
         print(f"Error while sending data to Laravel: {str(e)}")
 
+def log_to_excel_generate(nip, detection_time):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_row = {"nip": nip, "detection_time": detection_time, "created_at": now}
+    
+    excel_path = os.path.join(BASE_PYTHON_STORAGE, "generate_face_log.xlsx")
+    
+    if os.path.exists(excel_path):
+        df = pd.read_excel(excel_path)
+        new_df = pd.DataFrame([new_row])  # Convert new_row to DataFrame
+        df = pd.concat([df, new_df], ignore_index=True)  # Use concat instead of append
+    else:
+        df = pd.DataFrame([new_row])
+
+    df.to_excel(excel_path, index=False)
+
+def log_to_excel_recognition(nip, detection_time, status):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    new_row = {"nip": nip, "detection_time": detection_time, "created_at": now, "status": status}
+    
+    excel_path = os.path.join(BASE_PYTHON_STORAGE, "recognition_face_log.xlsx")
+    
+    if os.path.exists(excel_path):
+        df = pd.read_excel(excel_path)
+        new_df = pd.DataFrame([new_row])  # Convert new_row to DataFrame
+        df = pd.concat([df, new_df], ignore_index=True)  # Use concat instead of append
+    else:
+        df = pd.DataFrame([new_row])
+
+    df.to_excel(excel_path, index=False)
+    
 if __name__ == "__main__":
     # app.run(host='192.168.72.7', port=5000,debug=True)
-    app.run(host='192.168.1.13', port=5000,debug=True)
+    app.run(host='192.168.1.7', port=5000,debug=True)
