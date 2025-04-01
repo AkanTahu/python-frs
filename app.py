@@ -5,7 +5,7 @@ import cv2
 import requests
 import numpy as np
 import time
-import openpyxl
+# import openpyxl
 import pandas as pd
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -218,4 +218,5 @@ def log_to_excel_recognition(nip, detection_time, status):
     
 if __name__ == "__main__":
     # app.run(host='192.168.72.7', port=5000,debug=True)
-    app.run(host='192.168.1.7', port=5000,debug=True)
+    # app.run(host='192.168.1.7', port=5000,debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
