@@ -16,8 +16,9 @@ app = Flask(__name__)
 # Konfigurasi folder dataset wajah dan hasil scan di Laravel
 BASE_PYTHON_STORAGE = os.path.abspath("./testing")
 BASE_LARAVEL_STORAGE = os.path.abspath("../rekachain-web/storage/app/public")
-DB_PATH = os.path.join(BASE_LARAVEL_STORAGE, "dataset_faces")
-RESULT_FOLDER = os.path.join(BASE_LARAVEL_STORAGE, "result_scan_faces")
+BASE_SHARED = "/shared-storage"
+DB_PATH = os.path.join(BASE_SHARED, "dataset_faces")
+RESULT_FOLDER = os.path.join(BASE_SHARED, "result_scan_faces")
 
 # Pastikan folder dataset_faces dan result_scan_faces ada
 os.makedirs(DB_PATH, exist_ok=True)
