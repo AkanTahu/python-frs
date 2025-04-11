@@ -25,7 +25,8 @@ os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
-LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
+# LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.7/scan-faces"
 
 def save_face_image(image_path, nip):
     # Baca gambar menggunakan OpenCV
@@ -43,7 +44,7 @@ def save_face_image(image_path, nip):
         return face_path
     return None
 
-@app.route("/register", methods=["POST"])
+@app.route("/frs/register", methods=["POST"])
 def register():
     start_time_reg = time.time()
     if "file" not in request.files:
@@ -92,7 +93,7 @@ def register():
         log_to_excel_generate(nip, detection_time_reg)    
 
         
-@app.route("/recognize", methods=["POST"])
+@app.route("/frs/recognize", methods=["POST"])
 def recognize():
     start_time_recog = time.time()
     print("Received request for recognition")
