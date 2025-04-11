@@ -45,3 +45,5 @@ ENV/
 # Local environment
 .env
 .env.local
+
+.xlsx

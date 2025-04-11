@@ -10,6 +10,7 @@ import pandas as pd
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
+
 app = Flask(__name__)
 
 
@@ -25,7 +26,10 @@ os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
-LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
+# LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.7/scan-faces"
+
+DeepFace.build_model('Facenet')
 
 def save_face_image(image_path, nip):
     # Baca gambar menggunakan OpenCV
@@ -43,7 +47,7 @@ def save_face_image(image_path, nip):
         return face_path
     return None
 
-@app.route("/register", methods=["POST"])
+@app.route("/frs/register", methods=["POST"])
 def register():
     start_time_reg = time.time()
     if "file" not in request.files:
@@ -92,7 +96,7 @@ def register():
         log_to_excel_generate(nip, detection_time_reg)    
 
         
-@app.route("/recognize", methods=["POST"])
+@app.route("/frs/recognize", methods=["POST"])
 def recognize():
     start_time_recog = time.time()
     print("Received request for recognition")
@@ -125,7 +129,7 @@ def recognize():
 
         for dataset_image in dataset_images:
             print(f"Comparing with: {dataset_image}")
-            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet")
+            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False)
             print(f"Result: {result}")
 
             if result["verified"]: 
@@ -218,6 +222,5 @@ def log_to_excel_recognition(nip, detection_time, status):
     df.to_excel(excel_path, index=False)
     
 if __name__ == "__main__":
-    # app.run(host='192.168.72.7', port=5000,debug=True)
-    # app.run(host='192.168.1.7', port=5000,debug=True)
+    print("Running Flask in development mode")
     app.run(debug=True, host='0.0.0.0', port=5000)
