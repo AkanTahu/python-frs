@@ -26,7 +26,7 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
 # LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
-LARAVEL_API_URL = "http://192.168.1.7/scan-faces"
+LARAVEL_API_URL = "http://192.168.99.33/scan-faces"
 
 def save_face_image(image_path, nip):
     # Baca gambar menggunakan OpenCV
@@ -126,7 +126,7 @@ def recognize():
 
         for dataset_image in dataset_images:
             print(f"Comparing with: {dataset_image}")
-            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet")
+            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False)
             print(f"Result: {result}")
 
             if result["verified"]: 
