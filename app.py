@@ -26,7 +26,7 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
 # LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
-LARAVEL_API_URL = "http://192.168.99.33/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.7/scan-faces"
 
 def save_face_image(image_path, nip):
     # Baca gambar menggunakan OpenCV
