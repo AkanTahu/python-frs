@@ -7,3 +7,4 @@ gunicorn
 Werkzeug
 DeepFace
 openpyxl
+gunicorn

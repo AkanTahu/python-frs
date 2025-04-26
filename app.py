@@ -10,6 +10,7 @@ import pandas as pd
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
+
 app = Flask(__name__)
 
 
@@ -25,8 +26,10 @@ os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
-# LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
-LARAVEL_API_URL = "http://192.168.1.7/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.7:8000/scan-faces"
+# LARAVEL_API_URL = "http://192.168.76.52/scan-faces"
+
+DeepFace.build_model('Facenet')
 
 def save_face_image(image_path, nip):
     # Baca gambar menggunakan OpenCV
@@ -219,6 +222,5 @@ def log_to_excel_recognition(nip, detection_time, status):
     df.to_excel(excel_path, index=False)
     
 if __name__ == "__main__":
-    # app.run(host='192.168.72.7', port=5000,debug=True)
-    # app.run(host='192.168.1.7', port=5000,debug=True)
+    print("Running Flask in development mode")
     app.run(debug=True, host='0.0.0.0', port=5000)

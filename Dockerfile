@@ -17,13 +17,13 @@ WORKDIR /app/backend-simple-FRS
 COPY requirements.txt .
 
 RUN pip install --upgrade pip && \
-    pip install --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "-w", "4", "--timeout", "300", "-b", "0.0.0.0:5000", "app:app"]
+
 
 EXPOSE 5000
