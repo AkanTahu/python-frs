@@ -38,6 +38,7 @@ ENV/
 *.jpeg
 *.png
 *.gif
+.xlsx
 
 # Logs
 *.log
