@@ -26,8 +26,8 @@ os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
-LARAVEL_API_URL = "http://192.168.1.7/scan-faces"
-# LARAVEL_API_URL = "http://192.168.76.52/scan-faces"
+# LARAVEL_API_URL = "http://192.168.73.14/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.15/scan-faces"
 
 DeepFace.build_model('Facenet')
 

@@ -1,5 +1,5 @@
 FROM python:3.9.9-slim
-LABEL org.opencontainers.image.source https://github.com/serengil/deepface
+# LABEL org.opencontainers.image.source https://github.com/serengil/deepface
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \

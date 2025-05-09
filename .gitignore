@@ -40,6 +40,8 @@ ENV/
 *.gif
 .xlsx
 
+/testing/*.xlsx
+
 # Logs
 *.log
 
