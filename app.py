@@ -9,6 +9,7 @@ import time
 import pandas as pd
 from werkzeug.utils import secure_filename
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 app = Flask(__name__)
@@ -50,6 +51,8 @@ def save_face_image(image_path, nip):
 @app.route("/frs/register", methods=["POST"])
 def register():
     start_time_reg = time.time()
+    start_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
+    
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
@@ -92,13 +95,16 @@ def register():
             os.remove(temp_file_path)
             
         end_time_reg = time.time()
+        end_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
         detection_time_reg = end_time_reg - start_time_reg
-        log_to_excel_generate(nip, detection_time_reg)    
+        log_to_excel_generate(nip, detection_time_reg, start_detail, end_detail)    
 
         
 @app.route("/frs/recognize", methods=["POST"])
 def recognize():
     start_time_recog = time.time()
+    start_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
+    
     print("Received request for recognition")
     if "file" not in request.files or "nip" not in request.form:
         return jsonify({"error": "File and nip are required"}), 400
@@ -127,6 +133,7 @@ def recognize():
         dataset_images = [os.path.join(user_dataset_path, img) for img in os.listdir(user_dataset_path)[:3]]
         print(f"Dataset images: {dataset_images}")
 
+        status = "GAGAL"
         for dataset_image in dataset_images:
             print(f"Comparing with: {dataset_image}")
             result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False)
@@ -141,18 +148,19 @@ def recognize():
                 send_data_to_laravel(user_id, result_filename, status, panel, kpm)
                 
                 end_time_recog = time.time()
+                end_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
                 detection_time_recog = end_time_recog - start_time_recog
                 
                 return jsonify({"status": "1"}), 200 
-            else:
-                result_filename = f"{nip}_{filename}"
-                result_image_path = os.path.join(RESULT_FOLDER, result_filename)
-                cv2.imwrite(result_image_path, cv2.imread(file_path))
+            
+            result_filename = f"{nip}_{filename}"
+            result_image_path = os.path.join(RESULT_FOLDER, result_filename)
+            cv2.imwrite(result_image_path, cv2.imread(file_path))
                         
-                status = "GAGAL"
-                send_data_to_laravel(user_id, result_filename, status, panel, kpm)
+            status = "GAGAL"
+            send_data_to_laravel(user_id, result_filename, status, panel, kpm)
                 
-                return jsonify({"status": "0"}), 200 
+            return jsonify({"status": "0"}), 200 
 
     except Exception as e:
         print(f"Error during face verification: {str(e)}") 
@@ -163,7 +171,7 @@ def recognize():
         
         end_time_recog = time.time()
         detection_time_recog = end_time_recog - start_time_recog
-        log_to_excel_recognition(nip, detection_time_recog, status)
+        log_to_excel_recognition(nip, detection_time_recog, status, start_detail, end_detail)
             
 def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
     """Fungsi untuk mengirim data ke Laravel"""
@@ -191,9 +199,9 @@ def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
     except requests.exceptions.RequestException as e:
         print(f"Error while sending data to Laravel: {str(e)}")
 
-def log_to_excel_generate(nip, detection_time):
+def log_to_excel_generate(nip, detection_time, start_detail, end_detail):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_row = {"nip": nip, "detection_time": detection_time, "created_at": now}
+    new_row = {"nip": nip,"start_time": start_detail, "end_time": end_detail, "detection_time": detection_time, "created_at": now}
     
     excel_path = os.path.join(BASE_PYTHON_STORAGE, "generate_face_log.xlsx")
     
@@ -206,9 +214,9 @@ def log_to_excel_generate(nip, detection_time):
 
     df.to_excel(excel_path, index=False)
 
-def log_to_excel_recognition(nip, detection_time, status):
+def log_to_excel_recognition(nip, detection_time, status, start_detail, end_detail):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_row = {"nip": nip, "detection_time": detection_time, "created_at": now, "status": status}
+    new_row = {"nip": nip,"start_time": start_detail, "end_time": end_detail, "detection_time": detection_time, "created_at": now, "status": status}
     
     excel_path = os.path.join(BASE_PYTHON_STORAGE, "recognition_face_log.xlsx")
     
