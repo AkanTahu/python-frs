@@ -48,3 +48,4 @@ ENV/
 # Local environment
 .env
 .env.local
+!/testing/
