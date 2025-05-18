@@ -25,10 +25,11 @@ RESULT_FOLDER = os.path.join(BASE_SHARED, "result_scan_faces")
 # Pastikan folder dataset_faces dan result_scan_faces ada
 os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
+os.makedirs(BASE_PYTHON_STORAGE, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
 # LARAVEL_API_URL = "http://192.168.73.14/scan-faces"
-LARAVEL_API_URL = "http://192.168.1.15/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.13/scan-faces"
 
 DeepFace.build_model('Facenet')
 
