@@ -18,7 +18,7 @@ app = Flask(__name__)
 # Konfigurasi folder dataset wajah dan hasil scan di Laravel
 BASE_PYTHON_STORAGE = os.path.abspath("./testing")
 BASE_LARAVEL_STORAGE = os.path.abspath("../rekachain-web/storage/app/public")
-BASE_SHARED = "/shared-storage"
+BASE_SHARED = "../shared-storage"
 DB_PATH = os.path.join(BASE_SHARED, "dataset_faces")
 RESULT_FOLDER = os.path.join(BASE_SHARED, "result_scan_faces")
 
@@ -28,7 +28,7 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
 # LARAVEL_API_URL = "http://192.168.73.14/scan-faces"
-LARAVEL_API_URL = "http://192.168.1.13/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.6/scan-faces"
 
 DeepFace.build_model('Facenet')
 
@@ -232,3 +232,4 @@ def log_to_excel_recognition(nip, detection_time, status, start_detail, end_deta
 if __name__ == "__main__":
     print("Running Flask in development mode")
     app.run(debug=True, host='0.0.0.0', port=5000)
+
