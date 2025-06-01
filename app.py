@@ -169,7 +169,8 @@ def recognize():
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        end_time_recog = time.time()
+        end_time_reg = time.time()
+        end_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
         detection_time_recog = end_time_recog - start_time_recog
         log_to_excel_recognition(nip, detection_time_recog, status, start_detail, end_detail)
             
