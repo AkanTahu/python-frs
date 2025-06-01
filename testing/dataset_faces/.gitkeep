@@ -1,0 +1,2 @@
+echo. > shared-storage/dataset_faces/.gitkeep
+echo. > shared-storage/result_scan_faces/.gitkeep
