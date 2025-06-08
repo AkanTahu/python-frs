@@ -25,11 +25,10 @@ RESULT_FOLDER = os.path.join(BASE_SHARED, "result_scan_faces")
 # Pastikan folder dataset_faces dan result_scan_faces ada
 os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
-os.makedirs(BASE_PYTHON_STORAGE, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
 # LARAVEL_API_URL = "http://192.168.73.14/scan-faces"
-LARAVEL_API_URL = "http://192.168.1.6/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.8/scan-faces"
 
 DeepFace.build_model('Facenet')
 
@@ -137,7 +136,7 @@ def recognize():
         status = "GAGAL"
         for dataset_image in dataset_images:
             print(f"Comparing with: {dataset_image}")
-            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False, distance_metric = 'euclidean')
+            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False)
             print(f"Result: {result}")
 
             if result["verified"]: 
@@ -170,7 +169,8 @@ def recognize():
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        end_time_recog = time.time()
+        end_time_reg = time.time()
+        end_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
         detection_time_recog = end_time_recog - start_time_recog
         log_to_excel_recognition(nip, detection_time_recog, status, start_detail, end_detail)
             
