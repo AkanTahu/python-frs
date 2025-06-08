@@ -137,7 +137,7 @@ def recognize():
         status = "GAGAL"
         for dataset_image in dataset_images:
             print(f"Comparing with: {dataset_image}")
-            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False)
+            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False, distance_metric = 'euclidean')
             print(f"Result: {result}")
 
             if result["verified"]: 
