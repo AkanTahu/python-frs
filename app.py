@@ -18,7 +18,7 @@ app = Flask(__name__)
 # Konfigurasi folder dataset wajah dan hasil scan di Laravel
 BASE_PYTHON_STORAGE = os.path.abspath("./testing")
 BASE_LARAVEL_STORAGE = os.path.abspath("../rekachain-web/storage/app/public")
-BASE_SHARED = "../shared-storage"
+BASE_SHARED = "/shared-storage"
 DB_PATH = os.path.join(BASE_SHARED, "dataset_faces")
 RESULT_FOLDER = os.path.join(BASE_SHARED, "result_scan_faces")
 
@@ -28,7 +28,7 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
 # LARAVEL_API_URL = "http://192.168.73.14/scan-faces"
-LARAVEL_API_URL = "http://192.168.1.6/scan-faces"
+LARAVEL_API_URL = "http://192.168.1.8/scan-faces"
 
 DeepFace.build_model('Facenet')
 
@@ -111,9 +111,9 @@ def recognize():
 
     file = request.files["file"]
     nip = request.form["nip"]
-    user_id  = request.form["id"]
-    panel  = request.form["panel"]
-    kpm  = request.form["kpm"]
+    user_id = request.form["id"]
+    panel = request.form["panel"]
+    kpm = request.form["kpm"]
     
     print(f"Received file: {file}, nip: {nip}, user_id: {user_id}, panel: {panel}, kpm: {kpm}")
 
@@ -129,50 +129,86 @@ def recognize():
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(file_path)
     
+    status = "GAGAL"
+    
     try:
         dataset_images = [os.path.join(user_dataset_path, img) for img in os.listdir(user_dataset_path)[:3]]
         print(f"Dataset images: {dataset_images}")
 
-        status = "GAGAL"
-        for dataset_image in dataset_images:
-            print(f"Comparing with: {dataset_image}")
-            result = DeepFace.verify(img1_path=file_path, img2_path=dataset_image, model_name="Facenet", enforce_detection=False)
-            print(f"Result: {result}")
+        verification_success = False
+        last_result = None  # Simpan hasil pengecekan terakhir
+        
+        # Loop melalui semua dataset images
+        for i, dataset_image in enumerate(dataset_images):
+            print(f"Comparing with dataset {i+1}: {dataset_image}")
+            try:
+                result = DeepFace.verify(
+                    img1_path=file_path, 
+                    img2_path=dataset_image, 
+                    model_name="Facenet", 
+                    enforce_detection=False, 
+                    distance_metric = 'euclidean')
+                print(f"Result {i+1}: {result}")
+                
+                # Simpan hasil terakhir
+                last_result = result
 
-            if result["verified"]: 
-                result_filename = f"{nip}_{filename}"
-                result_image_path = os.path.join(RESULT_FOLDER, result_filename)
-                cv2.imwrite(result_image_path, cv2.imread(file_path))
-                
-                status = "SUKSES"
-                send_data_to_laravel(user_id, result_filename, status, panel, kpm)
-                
-                end_time_recog = time.time()
-                end_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
-                detection_time_recog = end_time_recog - start_time_recog
-                
-                return jsonify({"status": "1"}), 200 
-            
-            result_filename = f"{nip}_{filename}"
-            result_image_path = os.path.join(RESULT_FOLDER, result_filename)
-            cv2.imwrite(result_image_path, cv2.imread(file_path))
-                        
-            status = "GAGAL"
-            send_data_to_laravel(user_id, result_filename, status, panel, kpm)
-                
+                if result["verified"]: 
+                    verification_success = True
+                    status = "SUKSES"
+                    print(f"Face verified successfully with dataset {i+1}")
+                    break  # Keluar dari loop jika sudah berhasil
+                else:
+                    print(f"Face not verified with dataset {i+1}. Distance: {result.get('distance', 'N/A')}, Threshold: {result.get('threshold', 'N/A')}")
+                    
+            except Exception as verify_error:
+                print(f"Error verifying with dataset {i+1}: {str(verify_error)}")
+                continue  # Lanjut ke dataset berikutnya jika ada error
+        
+        # Simpan hasil setelah semua perbandingan selesai
+        result_filename = f"{nip}_{filename}"
+        result_image_path = os.path.join(RESULT_FOLDER, result_filename)
+        cv2.imwrite(result_image_path, cv2.imread(file_path))
+        
+        # KIRIM DATA KE LARAVEL HANYA SEKALI SETELAH SEMUA PENGECEKAN SELESAI
+        print(f"Sending final result to Laravel - Status: {status}")
+        if verification_success:
+            print("Sending SUCCESS result to database")
+        else:
+            print("Sending FAILED result (from last check) to database")
+            if last_result:
+                print(f"Last check details - Distance: {last_result.get('distance', 'N/A')}, Threshold: {last_result.get('threshold', 'N/A')}")
+        
+        send_data_to_laravel(user_id, result_filename, status, panel, kpm)
+        
+        print(f"Final verification result: {verification_success}, status: {status}")
+        
+        # Return response berdasarkan hasil final
+        if verification_success:
+            print("Returning success status: 1")
+            return jsonify({"status": "1"}), 200 
+        else:
+            print("Returning failed status: 0")
             return jsonify({"status": "0"}), 200 
 
     except Exception as e:
         print(f"Error during face verification: {str(e)}") 
+        status = "ERROR"
         return jsonify({"error": str(e)}), 500
     finally:
+        # Cleanup file
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        end_time_reg = time.time()
+        # Log ke Excel dengan error handling
+        end_time_recog = time.time()
         end_detail = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%H:%M:%S")
         detection_time_recog = end_time_recog - start_time_recog
-        log_to_excel_recognition(nip, detection_time_recog, status, start_detail, end_detail)
+        
+        try:
+            log_to_excel_recognition(nip, detection_time_recog, status, start_detail, end_detail)
+        except Exception as log_error:
+            print(f"Error logging to Excel: {str(log_error)}")
             
 def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
     """Fungsi untuk mengirim data ke Laravel"""
@@ -216,21 +252,47 @@ def log_to_excel_generate(nip, detection_time, start_detail, end_detail):
     df.to_excel(excel_path, index=False)
 
 def log_to_excel_recognition(nip, detection_time, status, start_detail, end_detail):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    new_row = {"nip": nip,"start_time": start_detail, "end_time": end_detail, "detection_time": detection_time, "created_at": now, "status": status}
-    
-    excel_path = os.path.join(BASE_PYTHON_STORAGE, "recognition_face_log.xlsx")
-    
-    if os.path.exists(excel_path):
-        df = pd.read_excel(excel_path)
-        new_df = pd.DataFrame([new_row])  # Convert new_row to DataFrame
-        df = pd.concat([df, new_df], ignore_index=True)  # Use concat instead of append
-    else:
-        df = pd.DataFrame([new_row])
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        new_row = {
+            "nip": nip,
+            "start_time": start_detail, 
+            "end_time": end_detail, 
+            "detection_time": detection_time, 
+            "created_at": now, 
+            "status": status
+        }
+        
+        excel_path = os.path.join(BASE_PYTHON_STORAGE, "recognition_face_log.xlsx")
+        
+        # Handle corrupt Excel file
+        try:
+            if os.path.exists(excel_path):
+                df = pd.read_excel(excel_path)
+                new_df = pd.DataFrame([new_row])
+                df = pd.concat([df, new_df], ignore_index=True)
+            else:
+                df = pd.DataFrame([new_row])
+        except Exception as excel_error:
+            print(f"Excel file corrupt, creating new one: {str(excel_error)}")
+            # Backup file lama jika ada
+            if os.path.exists(excel_path):
+                backup_path = excel_path.replace('.xlsx', f'_backup_{int(time.time())}.xlsx')
+                try:
+                    os.rename(excel_path, backup_path)
+                    print(f"Corrupt file backed up to: {backup_path}")
+                except:
+                    os.remove(excel_path)  # Hapus jika tidak bisa backup
+            
+            # Buat DataFrame baru
+            df = pd.DataFrame([new_row])
 
-    df.to_excel(excel_path, index=False)
+        df.to_excel(excel_path, index=False)
+        print(f"Successfully logged to Excel: {excel_path}")
+        
+    except Exception as e:
+        print(f"Failed to log to Excel: {str(e)}")
     
 if __name__ == "__main__":
     print("Running Flask in development mode")
     app.run(debug=True, host='0.0.0.0', port=5000)
-
