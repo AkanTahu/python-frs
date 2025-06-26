@@ -28,7 +28,7 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 
 app.config["UPLOAD_FOLDER"] = DB_PATH
 # LARAVEL_API_URL = "http://192.168.73.14/scan-faces"
-LARAVEL_API_URL = "http://192.168.1.8/scan-faces"
+LARAVEL_API_URL = "http://104.196.50.183/scan-faces"
 
 DeepFace.build_model('Facenet')
 
@@ -209,6 +209,69 @@ def recognize():
             log_to_excel_recognition(nip, detection_time_recog, status, start_detail, end_detail)
         except Exception as log_error:
             print(f"Error logging to Excel: {str(log_error)}")
+            
+@app.route("/frs/recognize-test", methods=["POST"])
+def recognize_test():  # Ganti nama fungsi
+    
+    print("Received request for recognition test")
+    if "file" not in request.files or "nip" not in request.form:
+        return jsonify({"error": "File and nip are required"}), 400
+
+    file = request.files["file"]
+    nip = request.form["nip"]
+
+    user_dataset_path = os.path.join(DB_PATH, nip)
+
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(file_path)
+    
+    try:
+        dataset_images = [os.path.join(user_dataset_path, img) for img in os.listdir(user_dataset_path)[:3]]
+        print(f"Dataset images: {dataset_images}")
+
+        verification_success = False
+        
+        # Loop melalui semua dataset images
+        for i, dataset_image in enumerate(dataset_images):
+            print(f"Comparing with dataset {i+1}: {dataset_image}")
+            try:
+                result = DeepFace.verify(
+                    img1_path=file_path, 
+                    img2_path=dataset_image, 
+                    model_name="Facenet", 
+                    enforce_detection=False, 
+                    distance_metric='euclidean')
+                print(f"Result {i+1}: {result}")
+
+                if result["verified"]: 
+                    verification_success = True
+                    print(f"Face verified successfully with dataset {i+1}")
+                    break  # Keluar dari loop jika sudah berhasil
+                else:
+                    print(f"Face not verified with dataset {i+1}. Distance: {result.get('distance', 'N/A')}, Threshold: {result.get('threshold', 'N/A')}")
+                    
+            except Exception as verify_error:
+                print(f"Error verifying with dataset {i+1}: {str(verify_error)}")
+                continue  # Lanjut ke dataset berikutnya jika ada error
+        
+        # Return response berdasarkan hasil final
+        if verification_success:
+            print("Returning success status: 1")
+            return jsonify({"status": "1", "message": "Face verified successfully"}), 200 
+        else:
+            print("Returning failed status: 0")
+            return jsonify({"status": "0", "message": "Face verification failed"}), 200 
+
+    except Exception as e:
+        print(f"Error during face verification: {str(e)}") 
+        return jsonify({"status": "2", "error": str(e)}), 200  # Gunakan status 2 untuk error
+    finally:
+        # Cleanup file - PENTING: hapus file temporary
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"Cleaned up temporary file: {file_path}")
+
             
 def send_data_to_laravel(user_id, result_image_path, status, panel, kpm):
     """Fungsi untuk mengirim data ke Laravel"""
